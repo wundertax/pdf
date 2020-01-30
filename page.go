@@ -448,8 +448,15 @@ type Point struct {
 
 // Content describes the basic content on a page: the text and any drawn rectangles.
 type Content struct {
-	Text []Text
+	Text Texts
 	Rect []Rect
+}
+
+type Texts []Text
+
+type ContentBlocks struct {
+	Texts []Texts
+	Rect  []Rect
 }
 
 type gstate struct {
@@ -755,8 +762,19 @@ func (p Page) walkTextBlocks(walker func(enc TextEncoding, x, y float64, s strin
 	})
 }
 
-// Content returns the page's content.
 func (p Page) Content() Content {
+	contentBlocks := p.ContentBlocks()
+	content := Content{
+		Rect: contentBlocks.Rect,
+	}
+	for _, text := range contentBlocks.Texts {
+		content.Text = append(content.Text, text...)
+	}
+	return content
+}
+
+// Content returns the page's content.
+func (p Page) ContentBlocks() ContentBlocks {
 	strm := p.V.Key("Contents")
 	var enc TextEncoding = &nopEncoder{}
 
@@ -765,9 +783,10 @@ func (p Page) Content() Content {
 		CTM: ident,
 	}
 
-	var text []Text
+	var blocks []Texts
 	showText := func(s string) {
 		n := 0
+		var texts Texts
 		decoded := enc.Decode(s)
 		for _, ch := range decoded {
 			var w0 float64
@@ -782,11 +801,14 @@ func (p Page) Content() Content {
 			}
 
 			Trm := matrix{{g.Tfs * g.Th, 0, 0}, {0, g.Tfs, 0}, {0, g.Trise, 1}}.mul(g.Tm).mul(g.CTM)
-			text = append(text, Text{f, Trm[0][0], Trm[2][0], Trm[2][1], w0 / 1000 * Trm[0][0], string(ch)})
+			texts = append(texts, Text{f, Trm[0][0], Trm[2][0], Trm[2][1], w0 / 1000 * Trm[0][0], string(ch)})
 
 			tx := w0/1000*g.Tfs + g.Tc
 			tx *= g.Th
 			g.Tm = matrix{{1, 0, 0}, {0, 1, 0}, {tx, 0, 1}}.mul(g.Tm)
+		}
+		if len(texts) > 0 {
+			blocks = append(blocks, texts)
 		}
 	}
 
@@ -968,7 +990,7 @@ func (p Page) Content() Content {
 			g.Th = args[0].Float64() / 100
 		}
 	})
-	return Content{text, rect}
+	return ContentBlocks{blocks, rect}
 }
 
 // TextVertical implements sort.Interface for sorting
