@@ -108,7 +108,8 @@ Reading:
 				val := stk.Pop()
 				key, ok := stk.Pop().data.(name)
 				if !ok {
-					panic("def of non-name")
+					Log.Warn("def of non-name")
+					continue
 				}
 				dicts[len(dicts)-1][key] = val.data
 				continue
