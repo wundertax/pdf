@@ -454,9 +454,14 @@ type Content struct {
 
 type Texts []Text
 
+type ContentBlock struct {
+	Text
+	Texts Texts
+}
+
 type ContentBlocks struct {
-	Texts []Texts
-	Rect  []Rect
+	Blocks []ContentBlock
+	Rect   []Rect
 }
 
 type gstate struct {
@@ -767,8 +772,8 @@ func (p Page) Content() Content {
 	content := Content{
 		Rect: contentBlocks.Rect,
 	}
-	for _, text := range contentBlocks.Texts {
-		content.Text = append(content.Text, text...)
+	for _, block := range contentBlocks.Blocks {
+		content.Text = append(content.Text, block.Texts...)
 	}
 	return content
 }
@@ -783,12 +788,12 @@ func (p Page) ContentBlocks() ContentBlocks {
 		CTM: ident,
 	}
 
-	var blocks []Texts
+	var blocks []ContentBlock
 	showText := func(s string) {
 		n := 0
-		var texts Texts
+		var block ContentBlock
 		decoded := enc.Decode(s)
-		for _, ch := range decoded {
+		for i, ch := range decoded {
 			var w0 float64
 			if n < len(s) {
 				w0 = g.Tf.Width(int(s[n]))
@@ -801,14 +806,20 @@ func (p Page) ContentBlocks() ContentBlocks {
 			}
 
 			Trm := matrix{{g.Tfs * g.Th, 0, 0}, {0, g.Tfs, 0}, {0, g.Trise, 1}}.mul(g.Tm).mul(g.CTM)
-			texts = append(texts, Text{f, Trm[0][0], Trm[2][0], Trm[2][1], w0 / 1000 * Trm[0][0], string(ch)})
+			text := Text{f, Trm[0][0], Trm[2][0], Trm[2][1], w0 / 1000 * Trm[0][0], string(ch)}
+			block.Texts = append(block.Texts, text)
+			if i == 0 {
+				block.Text = text
+			} else {
+				block.Text.S += text.S
+			}
 
 			tx := w0/1000*g.Tfs + g.Tc
 			tx *= g.Th
 			g.Tm = matrix{{1, 0, 0}, {0, 1, 0}, {tx, 0, 1}}.mul(g.Tm)
 		}
-		if len(texts) > 0 {
-			blocks = append(blocks, texts)
+		if len(block.Texts) > 0 {
+			blocks = append(blocks, block)
 		}
 	}
 
